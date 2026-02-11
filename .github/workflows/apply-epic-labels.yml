@@ -1,0 +1,90 @@
+name: Apply Epic Labels
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (do not apply labels, just show what would be done)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  apply-epic-labels:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install requests
+
+      - name: Create labels (dry run check)
+        if: ${{ github.event.inputs.dry_run == 'true' }}
+        run: |
+          echo "🔍 DRY RUN MODE - No changes will be made"
+          echo ""
+          echo "Would create the following epic labels:"
+          echo "  - Épica 1 (Autenticación y Configuración Básica)"
+          echo "  - Épica 2 (Gestión de Tienda)"
+          echo "  - Épica 3 (Gestión de Productos)"
+          echo "  - Épica 4 (Gestión de Pedidos)"
+          echo "  - Épica 5 (Gestión de Pagos)"
+          echo "  - Épica 6 (Marketplace)"
+          echo "  - Épica 7 (Administración)"
+          echo "  - Épica 8 (Infraestructura)"
+          echo ""
+          echo "Would label the following issues:"
+          cat epic-mapping.json | python3 -c "
+import json
+import sys
+data = json.load(sys.stdin)
+for epic in data['epics']:
+    print(f\"  {epic['name']}: {', '.join(['#' + str(i) for i in epic['issues']])}\")"
+
+      - name: Apply epic labels
+        if: ${{ github.event.inputs.dry_run == 'false' }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "🏷️  Applying epic labels to issues..."
+          python apply-epic-labels.py
+
+      - name: Summary
+        run: |
+          echo "### Epic Labels Application Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+            echo "**Mode:** Dry Run (no changes made)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Mode:** Live (labels applied)" >> $GITHUB_STEP_SUMMARY
+          fi
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### Epic Distribution" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Epic | Issues |" >> $GITHUB_STEP_SUMMARY
+          echo "|------|--------|" >> $GITHUB_STEP_SUMMARY
+          cat epic-mapping.json | python3 -c "
+import json
+import sys
+data = json.load(sys.stdin)
+for epic in data['epics']:
+    issues_count = len(epic['issues'])
+    print(f\"| {epic['name']} | {issues_count} |\")" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total Issues:** 34" >> $GITHUB_STEP_SUMMARY
+          echo "**Total Epics:** 8" >> $GITHUB_STEP_SUMMARY

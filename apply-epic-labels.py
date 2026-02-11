@@ -14,6 +14,7 @@ import json
 import os
 import sys
 import requests
+from urllib.parse import quote
 
 # Configuration
 REPO_OWNER = "AnnaSG27"
@@ -87,7 +88,8 @@ def create_label(name, color, description):
         return True
     elif response.status_code == 422:
         # Label already exists, try to update it
-        update_url = f"{url}/{name}"
+        encoded_name = quote(name, safe='')
+        update_url = f"{url}/{encoded_name}"
         response = requests.patch(update_url, headers=headers, json=data)
         if response.status_code == 200:
             print(f"✓ Updated label: {name}")

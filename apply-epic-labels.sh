@@ -25,11 +25,22 @@ declare -A EPIC_COLORS=(
 # Create labels
 for epic in "${!EPIC_COLORS[@]}"; do
     echo "Creating label: $epic"
-    gh label create "$epic" \
+    if gh label create "$epic" \
         --repo "$REPO" \
         --color "${EPIC_COLORS[$epic]}" \
-        --description "Issues belonging to $epic" \
-        --force 2>/dev/null || echo "Label '$epic' already exists"
+        --description "Issues belonging to $epic" 2>/dev/null; then
+        echo "  ✓ Created new label: $epic"
+    else
+        # Label exists, try to update it
+        if gh label edit "$epic" \
+            --repo "$REPO" \
+            --color "${EPIC_COLORS[$epic]}" \
+            --description "Issues belonging to $epic" 2>/dev/null; then
+            echo "  ✓ Updated existing label: $epic"
+        else
+            echo "  ℹ Label '$epic' already exists (no changes needed)"
+        fi
+    fi
 done
 
 echo ""

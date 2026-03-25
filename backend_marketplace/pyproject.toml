@@ -1,0 +1,17 @@
+[project]
+name = "backend-marketplace"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "django==6.0.2",
+    "django-cors-headers==4.7.0",
+    "djangorestframework==3.15.2",
+    "djangorestframework-simplejwt==5.4.0",
+    "faker>=40.11.0",
+    "gunicorn==25.0.3",
+    "pillow==11.2.1",
+    "psycopg2-binary==2.9.11",
+    "python-dotenv==1.2.1",
+]

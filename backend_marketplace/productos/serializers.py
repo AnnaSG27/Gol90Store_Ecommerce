@@ -16,8 +16,8 @@ class VendedorResumenSerializer(serializers.Serializer):
 
     def get_iniciales(self, obj):
         f = obj.first_name[:1] if obj.first_name else ''
-        l = obj.last_name[:1] if obj.last_name else ''
-        initials = f'{f}{l}'.upper()
+        ln = obj.last_name[:1] if obj.last_name else ''
+        initials = f'{f}{ln}'.upper()
         if initials:
             return initials
         return obj.email[:2].upper()

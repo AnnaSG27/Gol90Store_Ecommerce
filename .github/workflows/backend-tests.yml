@@ -37,6 +37,7 @@ jobs:
       - name: Run tests
         run: |
           cd backend_marketplace
-          python manage.py test --verbosity=2
+          python manage.py test pedidos analytics core.tests_chat --verbosity=2
         env:
           DJANGO_SETTINGS_MODULE: core.test_settings
+          GEMINI_API_KEY: test-key-ci

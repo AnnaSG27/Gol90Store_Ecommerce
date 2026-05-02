@@ -8,7 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from productos.models import Producto
 from usuarios.models import Perfil, Usuario
 
-from .models import Pago, Pedido
+from .models import Pago, Pedido, PedidoItem
 
 
 def _token(user):
@@ -403,3 +403,53 @@ class TestStatusUpdate(BaseTestCase):
         url = reverse('pedido-estado', kwargs={'id': self.pedido_id})
         resp = self.client.patch(url, {'estado': 'pendiente'}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class TestPilotSingleStoreSync(APITestCase):
+    def test_pilot_seller_sees_orders_after_legacy_catalog_reassigned(self):
+        from usuarios.demo_seed import PILOT_SELLER_EMAIL, sync_pilot_single_store_ownership
+
+        store = Usuario.objects.create_user(email='store@gol90store.com', password='pw')
+        Perfil.objects.create(usuario=store, tipo_usuario='cliente')
+        pilot = Usuario.objects.create_user(email=PILOT_SELLER_EMAIL, password='pw')
+        Perfil.objects.create(usuario=pilot, tipo_usuario='freelancer')
+        buyer = Usuario.objects.create_user(email='buyer-pilot@test.com', password='pw')
+        Perfil.objects.create(usuario=buyer, tipo_usuario='cliente')
+
+        prod = Producto.objects.create(
+            titulo='Legacy shirt',
+            equipo='X',
+            temporada='2024/25',
+            categoria='otro',
+            precio=Decimal('10000.00'),
+            stock=5,
+            estado='publicado',
+            vendedor=store,
+        )
+        pedido = Pedido.objects.create(
+            cliente=buyer,
+            estado='confirmado',
+            total=Decimal('10000.00'),
+            subtotal=Decimal('10000.00'),
+        )
+        PedidoItem.objects.create(
+            pedido=pedido,
+            producto=prod,
+            vendedor=store,
+            producto_titulo_snapshot=prod.titulo,
+            cantidad=1,
+            talla='M',
+            precio_unitario_snapshot=Decimal('10000.00'),
+            subtotal=Decimal('10000.00'),
+        )
+
+        _auth(self.client, pilot)
+        self.assertEqual(len(self.client.get(reverse('pedidos-vendedor')).json()), 0)
+
+        sync_pilot_single_store_ownership(pilot)
+
+        _auth(self.client, pilot)
+        resp = self.client.get(reverse('pedidos-vendedor'))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.json()), 1)
+        self.assertEqual(resp.json()[0]['id'], str(pedido.id))

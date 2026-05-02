@@ -3,6 +3,11 @@ from decimal import Decimal
 from django.core.management.base import BaseCommand
 
 from productos.models import Producto
+from usuarios.demo_seed import (
+    PILOT_SELLER_EMAIL,
+    ensure_local_demo_users,
+    run_sprint2_demo_post_seed,
+)
 from usuarios.models import Perfil, Usuario
 
 DEMO_PASSWORD = 'Demo1234!'
@@ -174,11 +179,15 @@ class Command(BaseCommand):
         if options['clear']:
             self._clear_demo_data()
 
-        seller = self._ensure_demo_users()
-        created = self._ensure_products(seller)
+        ensure_local_demo_users()
+        self._ensure_demo_users()
+        pilot = Usuario.objects.get(email=PILOT_SELLER_EMAIL)
+        created = self._ensure_products(pilot)
+        reassigned, images = run_sprint2_demo_post_seed(pilot)
         self.stdout.write(
             self.style.SUCCESS(
-                f'Demo data ready. {created} products created for Gol90Store.'
+                f'Demo data ready. {created} products created for Gol90Store. '
+                f'Reassigned to pilot: {reassigned}. Demo images added: {images}.'
             )
         )
 
@@ -190,7 +199,6 @@ class Command(BaseCommand):
         self.stdout.write('Cleared existing Gol90Store demo data')
 
     def _ensure_demo_users(self):
-        seller = None
         for data in DEMO_USERS:
             user, created = Usuario.objects.get_or_create(
                 email=data['email'],
@@ -215,11 +223,6 @@ class Command(BaseCommand):
                     'tipo_usuario': Perfil.TipoUsuario.CLIENTE,
                 },
             )
-
-            if data['email'] == 'store@gol90store.com':
-                seller = user
-
-        return seller
 
     def _ensure_products(self, seller):
         created = 0

@@ -107,6 +107,14 @@ Gol90Store/
 docker compose up --build
 ```
 
+Al levantar el contenedor **backend**, el script `entrypoint.sh` ejecuta en orden: `migrate`, `seed_habilidades` y **`seed_demo`**. No necesitas correr migraciones ni semillas a mano para ver el avance: espera a que el backend termine de arrancar (revisa logs si hace falta) y entra con email y contraseña en las URLs de abajo.
+
+**Inicio rapido (solo login):**
+
+1. `docker compose up --build` y espera a que backend y frontend esten listos.
+2. App (comprador o vendedor): `http://localhost:3000/login` con `cliente@gol90store.local` / `Customer12345!` o `vendedor@gol90store.local` / `Seller12345!`.
+3. Panel Django Admin: `http://localhost:8000/admin/` con `admin@gol90store.local` / `Admin12345!`.
+
 Servicios esperados:
 
 - Frontend: `http://localhost:3000`
@@ -122,23 +130,49 @@ docker compose logs backend --tail=50
 docker compose logs frontend --tail=50
 ```
 
-## Poblar datos demo
+## Migraciones de base de datos
+
+**Docker:** el backend aplica `migrate` al iniciar (ver `entrypoint.sh`). Solo ejecuta migrate a mano si cambiaste migraciones con el contenedor parado o necesitas forzar algo.
 
 ```bash
-docker compose exec -T backend python manage.py seed_demo_data --clear
+docker compose exec -T backend python manage.py migrate
 ```
 
-Credenciales demo:
-
-- Usuario tienda: `store@gol90store.com`
-- Usuario cliente: `cliente.demo@gol90store.com`
-- Password: `Demo1234!`
-
-Para promover un usuario existente a superusuario:
+**Backend local** (sin Docker, con SQLite de pruebas o base configurada):
 
 ```bash
-docker compose exec -T backend python manage.py ensure_superuser store@gol90store.com
+cd backend_marketplace
+DJANGO_SETTINGS_MODULE=core.settings python manage.py migrate
 ```
+
+Para el entorno de pruebas automatizadas del backend se usa `core.test_settings`; las migraciones se aplican implicitamente al correr `manage.py test`.
+
+## Cuentas demo locales (Sprint 2)
+
+**Solo entorno local y presentaciones.** No usar estas credenciales en produccion ni exponerlas como secretos reales. El comando `seed_demo` es idempotente: puede ejecutarse varias veces; no duplica usuarios ni productos demo por titulo, y restablece las contrasenas documentadas.
+
+Con **Docker Compose**, `seed_demo` ya se ejecuta al arrancar el backend; no hace falta repetirlo salvo que quieras forzarlo tras un cambio puntual:
+
+```bash
+docker compose exec -T backend python manage.py seed_demo
+```
+
+Sin Docker (desde `backend_marketplace` con tu `DJANGO_SETTINGS_MODULE` habitual):
+
+```bash
+python manage.py migrate
+python manage.py seed_demo
+```
+
+| Rol en la app | Email | Password | Donde iniciar sesion |
+| --- | --- | --- | --- |
+| Administrador Django | `admin@gol90store.local` | `Admin12345!` | `http://localhost:8000/admin/` |
+| Vendedor (API JWT + panel) | `vendedor@gol90store.local` | `Seller12345!` | `http://localhost:3000/login` luego `http://localhost:3000/seller` y rutas bajo `/seller/` |
+| Comprador | `cliente@gol90store.local` | `Customer12345!` | `http://localhost:3000/login` luego catalogo, carrito y `http://localhost:3000/mis-pedidos` |
+
+En el modelo, el vendedor corresponde a `Perfil.tipo_usuario = freelancer` y el comprador a `cliente` (no existen literales `seller`/`admin` en perfil; el admin es `is_superuser` en el usuario).
+
+Comando legacy alternativo (otros emails y catalogo distinto): `python manage.py seed_demo_data` (opcion `--clear`). Para promover un usuario existente a superusuario de forma interactiva: `python manage.py ensure_superuser <email>`.
 
 ## Backend local
 
@@ -149,6 +183,7 @@ cd backend_marketplace
 python3.13 -m venv .venv313
 .venv313/bin/python -m pip install --upgrade pip
 .venv313/bin/python -m pip install -r requirements.txt
+DJANGO_SETTINGS_MODULE=core.test_settings .venv313/bin/python manage.py migrate
 DJANGO_SETTINGS_MODULE=core.test_settings .venv313/bin/python manage.py check
 DJANGO_SETTINGS_MODULE=core.test_settings .venv313/bin/python manage.py makemigrations --check --dry-run
 DJANGO_SETTINGS_MODULE=core.test_settings .venv313/bin/python manage.py test --verbosity=2

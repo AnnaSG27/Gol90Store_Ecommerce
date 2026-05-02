@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { getMisProductos } from "@/features/seller/services/sellerProductService";
+import { absolutizeBackendMediaUrl } from "@/features/services/catalog-assets";
 import type { PublicacionListItem } from "@/features/services/models";
 import { useAuth } from "@/infrastructure/auth/AuthContext";
 
@@ -85,16 +86,20 @@ export default function SellerProductsPage() {
             <span className="col-span-2">Estado</span>
             <span className="col-span-1 text-right">Accion</span>
           </div>
-          {products.map((product) => (
+          {products.map((product) => {
+            const thumb = absolutizeBackendMediaUrl(
+              product.imagen_principal_url,
+            );
+            return (
             <div
               key={product.id}
               className="grid grid-cols-12 items-center gap-3 border-b border-slate-100 px-4 py-4 text-sm last:border-b-0"
             >
               <div className="col-span-12 flex items-center gap-3 md:col-span-5">
                 <div className="size-14 overflow-hidden rounded-xl bg-slate-100">
-                  {product.imagen_principal_url ? (
+                  {thumb ? (
                     <img
-                      src={product.imagen_principal_url}
+                      src={thumb}
                       alt={product.titulo}
                       className="size-full object-cover"
                     />
@@ -125,7 +130,8 @@ export default function SellerProductsPage() {
                 </Link>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

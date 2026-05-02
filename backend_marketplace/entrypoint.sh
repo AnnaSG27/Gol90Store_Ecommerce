@@ -19,5 +19,6 @@ echo "PostgreSQL is ready."
 
 python manage.py migrate
 python manage.py seed_habilidades
+python manage.py seed_demo
 
 exec python manage.py runserver 0.0.0.0:8000

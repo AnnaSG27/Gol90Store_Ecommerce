@@ -1,24 +1,31 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
-import { RiShoppingCart2Line, RiUser3Line } from "@remixicon/react"
+import { RiShoppingCart2Line, RiUser3Line } from "@remixicon/react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-import { useCart } from "@/features/cart/CartContext"
-import { BRAND_LOGO_PRIMARY } from "@/features/services/catalog-assets"
-import { useAuth } from "@/infrastructure/auth/AuthContext"
-import { cn } from "@/lib/utils"
+import { useCart } from "@/features/cart/CartContext";
+import { BRAND_LOGO_PRIMARY } from "@/features/services/catalog-assets";
+import { useAuth } from "@/infrastructure/auth/AuthContext";
+import { cn } from "@/lib/utils";
 
 const links = [
   { href: "/", label: "Inicio" },
   { href: "/productos", label: "Catalogo" },
   { href: "/carrito", label: "Carrito" },
-] as const
+] as const;
 
 export function StoreHeader() {
-  const pathname = usePathname()
-  const { totalItems } = useCart()
-  const { token } = useAuth()
+  const pathname = usePathname();
+  const { totalItems } = useCart();
+  const { token, perfil } = useAuth();
+  const canSell =
+    perfil?.tipo_usuario === "freelancer" || perfil?.tipo_usuario === "ambos";
+  const navLinks = [
+    ...links,
+    ...(token ? [{ href: "/mis-pedidos", label: "Pedidos" }] : []),
+    ...(canSell ? [{ href: "/seller", label: "Vendedor" }] : []),
+  ];
 
   return (
     <header className="sticky top-0 z-40 border-b border-white/60 bg-white/85 backdrop-blur-xl">
@@ -40,10 +47,10 @@ export function StoreHeader() {
         </Link>
 
         <nav className="hidden items-center gap-2 rounded-full border border-slate-200 bg-slate-50/80 p-1 md:flex">
-          {links.map((link) => {
+          {navLinks.map((link) => {
             const active =
               pathname === link.href ||
-              (link.href !== "/" && pathname.startsWith(link.href))
+              (link.href !== "/" && pathname.startsWith(link.href));
             return (
               <Link
                 key={link.href}
@@ -57,7 +64,7 @@ export function StoreHeader() {
               >
                 {link.label}
               </Link>
-            )
+            );
           })}
         </nav>
 
@@ -83,5 +90,5 @@ export function StoreHeader() {
         </div>
       </div>
     </header>
-  )
+  );
 }

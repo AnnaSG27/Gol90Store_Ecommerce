@@ -8,7 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from productos.models import Producto
 from usuarios.models import Perfil, Usuario
 
-from .models import Pedido
+from .models import Pago, Pedido
 
 
 def _token(user):
@@ -89,16 +89,37 @@ class TestOrderCreation(BaseTestCase):
         _auth(self.client, self.cliente_user)
         url = reverse('pedido-create')
         data = {
-            'items': [{'producto_id': str(self.producto.id), 'cantidad': 2}],
+            'items': [
+                {
+                    'producto_id': str(self.producto.id),
+                    'cantidad': 2,
+                    'talla': 'M',
+                }
+            ],
             'direccion_entrega': 'Calle 123',
         }
         resp = self.client.post(url, data, format='json')
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         body = resp.json()
-        self.assertEqual(body['estado'], 'pendiente')
+        self.assertEqual(body['estado'], 'confirmado')
+        self.assertEqual(Decimal(body['subtotal']), Decimal('300000.00'))
         self.assertEqual(Decimal(body['total']), Decimal('300000.00'))
+        self.assertEqual(body['pago']['estado'], 'aprobado')
+        self.assertTrue(body['pago']['referencia'].startswith('SIM-'))
         self.assertEqual(len(body['items']), 1)
         self.assertEqual(body['items'][0]['cantidad'], 2)
+        self.assertEqual(body['items'][0]['talla'], 'M')
+
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock, 8)
+
+    def test_customer_can_checkout_with_valid_items(self):
+        _auth(self.client, self.cliente_user)
+        url = reverse('pedido-checkout')
+        data = {'items': [{'producto_id': str(self.producto.id), 'cantidad': 1}]}
+        resp = self.client.post(url, data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.json()['estado'], 'confirmado')
 
     def test_create_order_snapshots_price_from_backend(self):
         _auth(self.client, self.cliente_user)
@@ -108,6 +129,80 @@ class TestOrderCreation(BaseTestCase):
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         item = resp.json()['items'][0]
         self.assertEqual(Decimal(item['precio_unitario_snapshot']), self.producto.precio)
+        self.assertEqual(item['producto_titulo_snapshot'], self.producto.titulo)
+
+        self.producto.precio = Decimal('999999.00')
+        self.producto.titulo = 'Nombre cambiado despues'
+        self.producto.save(update_fields=['precio', 'titulo', 'updated_at'])
+
+        pedido = Pedido.objects.get(pk=resp.json()['id'])
+        pedido_item = pedido.items.first()
+        self.assertEqual(pedido_item.precio_unitario_snapshot, Decimal('150000.00'))
+        self.assertEqual(pedido_item.producto_titulo_snapshot, 'Camiseta Real Madrid')
+
+    def test_frontend_total_is_ignored(self):
+        _auth(self.client, self.cliente_user)
+        url = reverse('pedido-create')
+        data = {
+            'items': [{'producto_id': str(self.producto.id), 'cantidad': 1}],
+            'total': '1.00',
+            'subtotal': '1.00',
+        }
+        resp = self.client.post(url, data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(Decimal(resp.json()['total']), Decimal('150000.00'))
+
+    def test_payment_record_is_persisted(self):
+        _auth(self.client, self.cliente_user)
+        url = reverse('pedido-create')
+        data = {'items': [{'producto_id': str(self.producto.id), 'cantidad': 1}]}
+        resp = self.client.post(url, data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+        pedido = Pedido.objects.get(pk=resp.json()['id'])
+        self.assertTrue(hasattr(pedido, 'pago'))
+        self.assertEqual(pedido.pago.estado, Pago.Estado.APROBADO)
+        self.assertEqual(pedido.pago.monto, Decimal('150000.00'))
+
+    def test_approved_simulated_payment_reduces_stock(self):
+        _auth(self.client, self.cliente_user)
+        url = reverse('pedido-checkout')
+        data = {'items': [{'producto_id': str(self.producto.id), 'cantidad': 3}]}
+        resp = self.client.post(url, data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.json()['pago']['estado'], Pago.Estado.APROBADO)
+
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock, 7)
+
+    def test_rejected_simulated_payment_rolls_back_order_and_stock(self):
+        _auth(self.client, self.cliente_user)
+        url = reverse('pedido-checkout')
+        data = {
+            'items': [{'producto_id': str(self.producto.id), 'cantidad': 1}],
+            'simular_pago_rechazado': True,
+        }
+        resp = self.client.post(url, data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock, 10)
+        self.assertEqual(Pedido.objects.count(), 0)
+        self.assertEqual(Pago.objects.count(), 0)
+
+    def test_unavailable_size_rejected_without_order_or_stock_change(self):
+        self.producto.tallas_disponibles = ['S', 'M']
+        self.producto.save(update_fields=['tallas_disponibles', 'updated_at'])
+        _auth(self.client, self.cliente_user)
+        url = reverse('pedido-checkout')
+        data = {'items': [{'producto_id': str(self.producto.id), 'cantidad': 1, 'talla': 'XL'}]}
+        resp = self.client.post(url, data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock, 10)
+        self.assertEqual(Pedido.objects.count(), 0)
+        self.assertEqual(Pago.objects.count(), 0)
 
     def test_invalid_product_id_rejected(self):
         _auth(self.client, self.cliente_user)
@@ -135,6 +230,29 @@ class TestOrderCreation(BaseTestCase):
         url = reverse('pedido-create')
         resp = self.client.post(url, {'items': []}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_insufficient_stock_rejected_without_reducing_inventory(self):
+        _auth(self.client, self.cliente_user)
+        url = reverse('pedido-create')
+        data = {'items': [{'producto_id': str(self.producto.id), 'cantidad': 11}]}
+        resp = self.client.post(url, data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock, 10)
+        self.assertEqual(Pedido.objects.count(), 0)
+        self.assertEqual(Pago.objects.count(), 0)
+
+    def test_stock_zero_marks_product_as_sold_out(self):
+        _auth(self.client, self.cliente_user)
+        url = reverse('pedido-create')
+        data = {'items': [{'producto_id': str(self.producto.id), 'cantidad': 10}]}
+        resp = self.client.post(url, data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock, 0)
+        self.assertEqual(self.producto.estado, Producto.Estado.AGOTADO)
 
 
 # ─── CUSTOMER VISIBILITY ISOLATION ────────────────────────────────────────────
@@ -204,11 +322,23 @@ class TestSellerVisibility(BaseTestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertGreater(len(resp.json()), 0)
 
+    def test_seller_can_see_related_order_detail(self):
+        pedido = Pedido.objects.first()
+        _auth(self.client, self.vendedor_user)
+        resp = self.client.get(reverse('pedido-detail', kwargs={'id': pedido.id}))
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
     def test_seller_cannot_see_unrelated_orders(self):
         _auth(self.client, self.otro_vendedor)
         resp = self.client.get(reverse('pedidos-vendedor'))
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(resp.json()), 0)
+
+    def test_unrelated_seller_cannot_see_order_detail(self):
+        pedido = Pedido.objects.first()
+        _auth(self.client, self.otro_vendedor)
+        resp = self.client.get(reverse('pedido-detail', kwargs={'id': pedido.id}))
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_customer_cannot_access_seller_view(self):
         _auth(self.client, self.cliente_user)
@@ -229,23 +359,23 @@ class TestStatusUpdate(BaseTestCase):
         )
         self.pedido_id = resp.json()['id']
 
-    def test_seller_can_update_status_to_confirmado(self):
+    def test_seller_can_update_status_to_en_preparacion(self):
         _auth(self.client, self.vendedor_user)
         url = reverse('pedido-estado', kwargs={'id': self.pedido_id})
-        resp = self.client.patch(url, {'estado': 'confirmado'}, format='json')
+        resp = self.client.patch(url, {'estado': 'en_preparacion'}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(resp.json()['estado'], 'confirmado')
+        self.assertEqual(resp.json()['estado'], 'en_preparacion')
 
     def test_admin_can_update_any_order_status(self):
         _auth(self.client, self.admin_user)
         url = reverse('pedido-estado', kwargs={'id': self.pedido_id})
-        resp = self.client.patch(url, {'estado': 'confirmado'}, format='json')
+        resp = self.client.patch(url, {'estado': 'en_preparacion'}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
     def test_customer_cannot_update_order_status(self):
         _auth(self.client, self.cliente_user)
         url = reverse('pedido-estado', kwargs={'id': self.pedido_id})
-        resp = self.client.patch(url, {'estado': 'confirmado'}, format='json')
+        resp = self.client.patch(url, {'estado': 'en_preparacion'}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_unrelated_seller_cannot_update_status(self):
@@ -253,7 +383,7 @@ class TestStatusUpdate(BaseTestCase):
         Perfil.objects.create(usuario=otro, tipo_usuario='freelancer')
         _auth(self.client, otro)
         url = reverse('pedido-estado', kwargs={'id': self.pedido_id})
-        resp = self.client.patch(url, {'estado': 'confirmado'}, format='json')
+        resp = self.client.patch(url, {'estado': 'en_preparacion'}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_invalid_status_transition_rejected(self):
@@ -262,9 +392,14 @@ class TestStatusUpdate(BaseTestCase):
         resp = self.client.patch(url, {'estado': 'entregado'}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_invalid_status_value_rejected(self):
+        _auth(self.client, self.vendedor_user)
+        url = reverse('pedido-estado', kwargs={'id': self.pedido_id})
+        resp = self.client.patch(url, {'estado': 'estado_invalido'}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_reverse_transition_rejected(self):
         _auth(self.client, self.vendedor_user)
         url = reverse('pedido-estado', kwargs={'id': self.pedido_id})
-        self.client.patch(url, {'estado': 'confirmado'}, format='json')
         resp = self.client.patch(url, {'estado': 'pendiente'}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)

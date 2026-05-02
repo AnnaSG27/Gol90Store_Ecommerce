@@ -47,11 +47,13 @@ def _make_producto(vendedor, titulo='Camiseta Colombia'):
 
 def _make_pedido(cliente, total, estado='entregado', items_data=None):
     """Create a Pedido with optional items."""
-    pedido = Pedido.objects.create(cliente=cliente, total=total, estado=estado)
+    pedido = Pedido.objects.create(cliente=cliente, subtotal=total, total=total, estado=estado)
     for (producto, cantidad, precio) in (items_data or []):
         PedidoItem.objects.create(
             pedido=pedido,
             producto=producto,
+            vendedor=producto.vendedor,
+            producto_titulo_snapshot=producto.titulo,
             cantidad=cantidad,
             precio_unitario_snapshot=precio,
             subtotal=precio * cantidad,

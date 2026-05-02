@@ -10,6 +10,7 @@ from .views import (
 
 urlpatterns = [
     path('', PedidoCreateView.as_view(), name='pedido-create'),
+    path('checkout/', PedidoCreateView.as_view(), name='pedido-checkout'),
     path('mis-pedidos/', MisPedidosView.as_view(), name='mis-pedidos'),
     path('vendedor/', PedidosVendedorView.as_view(), name='pedidos-vendedor'),
     path('<uuid:id>/', PedidoDetailView.as_view(), name='pedido-detail'),

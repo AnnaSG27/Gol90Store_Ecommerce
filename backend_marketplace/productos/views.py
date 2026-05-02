@@ -30,6 +30,8 @@ class ProductoListCreateView(generics.ListCreateAPIView):
     pagination_class = ProductoPagination
 
     def get_permissions(self):
+        if self.request.method == 'GET' and self.request.query_params.get('mine') == '1':
+            return [permissions.IsAuthenticated()]
         if self.request.method == 'POST':
             return [permissions.IsAuthenticated()]
         return [permissions.AllowAny()]
@@ -40,6 +42,14 @@ class ProductoListCreateView(generics.ListCreateAPIView):
         return ProductoListSerializer
 
     def get_queryset(self):
+        if self.request.query_params.get('mine') == '1':
+            return (
+                Producto.objects.filter(vendedor=self.request.user)
+                .select_related('vendedor__perfil')
+                .prefetch_related('imagenes')
+                .order_by('-created_at')
+            )
+
         qs = Producto.objects.activos().select_related('vendedor__perfil').prefetch_related('imagenes')
 
         q = self.request.query_params.get('q')

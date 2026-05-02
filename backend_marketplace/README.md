@@ -6,7 +6,7 @@ E-commerce backend for football products in Colombia. Built with Django 6.0.2 + 
 
 ## Team
 
-- **Andrés Vélez Rendón**
+- **Andres Velez Rendon**
 - **Anna**
 - **David Curelop**
 - **Abraham**
@@ -36,7 +36,8 @@ E-commerce backend for football products in Colombia. Built with Django 6.0.2 + 
 
 ```bash
 # Linux/Mac
-source ../env/bin/activate
+python3.13 -m venv .venv313
+source .venv313/bin/activate
 
 # Verify Python version (must be 3.13.x)
 python --version
@@ -46,7 +47,6 @@ python --version
 
 ```bash
 pip install -r requirements.txt
-pip install ruff  # lint tool
 ```
 
 ---
@@ -66,7 +66,7 @@ Backend available at: `http://localhost:8000`
 
 ```bash
 cd backend_marketplace
-source ../env/bin/activate
+source .venv313/bin/activate
 
 # Apply migrations
 DJANGO_SETTINGS_MODULE=core.test_settings python manage.py migrate
@@ -83,7 +83,7 @@ DJANGO_SETTINGS_MODULE=core.test_settings python manage.py runserver
 
 ```bash
 cd backend_marketplace
-DJANGO_SETTINGS_MODULE=core.test_settings python manage.py test
+DJANGO_SETTINGS_MODULE=core.test_settings python manage.py test --verbosity=2
 ```
 
 ### Run Tests with Verbosity
@@ -103,17 +103,21 @@ DJANGO_SETTINGS_MODULE=core.test_settings python manage.py test productos
 ### Test Results (Sprint 2 baseline)
 
 ```
-Ran 20 tests in ~15s — OK
+Ran 56 tests in 29.640s - OK
 ```
 
-All 20 tests pass with Python 3.13.11 and Django 6.0.2.
+The current Sprint 2 backend test suite covers orders, inventory, permissions, analytics, chat health, and seller product listing with Python 3.13 and Django 6.0.2.
 
 ---
 
-## Code Quality — Lint with Ruff
+## Code Quality — Optional Local Lint with Ruff
+
+Ruff configuration exists in `pyproject.toml`, but Ruff is not a required CI gate for Sprint 2.
+Install it locally only if you want to run the optional checks.
 
 ```bash
 cd backend_marketplace
+pip install ruff
 
 # Check for issues
 ruff check .
@@ -160,9 +164,9 @@ Configuration is in `pyproject.toml` (target: Python 3.13, line length: 100).
 
 | Method | URL | Description | Auth Required |
 |--------|-----|-------------|---------------|
-| POST | `/api/pedidos/` | Create order | Customer |
+| POST | `/api/pedidos/checkout/` | Create order with simulated payment | Customer |
 | GET | `/api/pedidos/mis-pedidos/` | List own orders | Customer |
-| GET | `/api/pedidos/<uuid>/` | Order detail | Owner or Admin |
+| GET | `/api/pedidos/<uuid>/` | Order detail | Customer owner, related seller, or Admin |
 | GET | `/api/pedidos/vendedor/` | Seller-visible orders | Seller / Admin |
 | PATCH | `/api/pedidos/<uuid>/estado/` | Update order status | Seller / Admin |
 
@@ -185,18 +189,10 @@ All transitions are validated server-side. Invalid transitions return `400 Bad R
 | `usuarios` | Custom user model (email-based auth) + Perfil |
 | `productos` | Football product catalog with images |
 | `pedidos` | Order management with status lifecycle |
+| `analytics` | Vendor sales summary endpoints |
 
 ---
 
 ## Sprint 2 Documentation
 
-All Sprint 2 evidence and planning documents are in `docs/sprint-2/`:
-
-- `00_baseline_inspection.md` — Repository inspection and environment baseline
-- `01_testing_strategy.md` — Automated testing strategy table
-- `02_traceability_matrix.md` — FR → CP → Result traceability
-- `03_test_execution_report.md` — Real test execution evidence
-- `04_bug_register.md` — Bug register with resolutions
-- `05_business_case_draft.md` — Finances and risk sections
-- `06_usability_protocol_draft.md` — Usability testing plan (Sprint 3 execution)
-- `07_presentation_outline.md` — Client and professor review outlines
+Sprint 2 implementation guidance is tracked in `docs/specs/` and execution prompts are tracked in `docs/prompts/`.

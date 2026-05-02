@@ -1,21 +1,59 @@
-"use client"
+"use client";
 
-import Link from "next/link"
 import {
   RiAddLine,
   RiDeleteBin6Line,
-  RiSubtractLine,
   RiShoppingBag3Line,
-} from "@remixicon/react"
+  RiSubtractLine,
+} from "@remixicon/react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { useCart } from "@/features/cart/CartContext"
-import { StoreHeader } from "@/shared/components/StoreHeader"
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { useCart } from "@/features/cart/CartContext";
+import { checkout } from "@/features/orders/services/orderService";
+import { useAuth } from "@/infrastructure/auth/AuthContext";
+import { StoreHeader } from "@/shared/components/StoreHeader";
 
 export default function CarritoPage() {
   const { items, subtotal, totalItems, updateQuantity, removeItem, clearCart } =
-    useCart()
+    useCart();
+  const { token } = useAuth();
+  const router = useRouter();
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleCheckout() {
+    setError(null);
+    if (!token) {
+      router.push("/login");
+      return;
+    }
+
+    setIsCheckingOut(true);
+    try {
+      const pedido = await checkout(
+        {
+          items: items.map((item) => ({
+            producto_id: item.id,
+            cantidad: item.quantity,
+            talla: item.size,
+          })),
+        },
+        token,
+      );
+      clearCart();
+      router.push(`/checkout/success?pedido=${pedido.id}`);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "No se pudo completar el pedido",
+      );
+    } finally {
+      setIsCheckingOut(false);
+    }
+  }
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#f8fafc_0%,#eefbf4_100%)]">
@@ -44,8 +82,8 @@ export default function CarritoPage() {
                   Tu carrito esta vacio
                 </h2>
                 <p className="max-w-md text-sm leading-7 text-slate-600">
-                  Agrega camisetas desde el catalogo para mostrar una experiencia
-                  de compra mas completa en la demo.
+                  Agrega camisetas desde el catalogo para mostrar una
+                  experiencia de compra mas completa en la demo.
                 </p>
               </div>
               <Button asChild className="bg-emerald-600 hover:bg-emerald-500">
@@ -57,7 +95,10 @@ export default function CarritoPage() {
           <div className="grid gap-6 lg:grid-cols-[1.4fr_0.6fr]">
             <div className="space-y-4">
               {items.map((item) => (
-                <Card key={`${item.id}-${item.size ?? "sin-talla"}`} className="border-white/80 bg-white/90 shadow-lg shadow-slate-950/5">
+                <Card
+                  key={`${item.id}-${item.size ?? "sin-talla"}`}
+                  className="border-white/80 bg-white/90 shadow-lg shadow-slate-950/5"
+                >
                   <CardContent className="flex flex-col gap-4 p-5 sm:flex-row">
                     <img
                       src={item.imageUrl}
@@ -89,7 +130,8 @@ export default function CarritoPage() {
                           </button>
                         </div>
                         <p className="text-xl font-black text-slate-950">
-                          ${(item.price * item.quantity).toLocaleString("es-CO")}
+                          $
+                          {(item.price * item.quantity).toLocaleString("es-CO")}
                         </p>
                       </div>
 
@@ -98,7 +140,11 @@ export default function CarritoPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              updateQuantity(item.id, item.quantity - 1, item.size)
+                              updateQuantity(
+                                item.id,
+                                item.quantity - 1,
+                                item.size,
+                              )
                             }
                             className="px-3 py-2 text-slate-600 hover:text-slate-950"
                           >
@@ -110,7 +156,11 @@ export default function CarritoPage() {
                           <button
                             type="button"
                             onClick={() =>
-                              updateQuantity(item.id, item.quantity + 1, item.size)
+                              updateQuantity(
+                                item.id,
+                                item.quantity + 1,
+                                item.size,
+                              )
                             }
                             className="px-3 py-2 text-slate-600 hover:text-slate-950"
                           >
@@ -149,8 +199,17 @@ export default function CarritoPage() {
                     <span>${subtotal.toLocaleString("es-CO")}</span>
                   </div>
                 </div>
-                <Button className="w-full bg-emerald-600 font-bold hover:bg-emerald-500">
-                  Continuar compra
+                {error && (
+                  <div className="rounded-xl border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {error}
+                  </div>
+                )}
+                <Button
+                  className="w-full bg-emerald-600 font-bold hover:bg-emerald-500"
+                  disabled={isCheckingOut}
+                  onClick={handleCheckout}
+                >
+                  {isCheckingOut ? "Confirmando pedido..." : "Confirmar pedido"}
                 </Button>
                 <Button
                   variant="outline"
@@ -171,5 +230,5 @@ export default function CarritoPage() {
         )}
       </section>
     </main>
-  )
+  );
 }

@@ -26,6 +26,9 @@ urlpatterns = [
     path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/usuarios/', include('usuarios.urls')),
     path('api/productos/', include('productos.urls')),
+    path('api/pedidos/', include('pedidos.urls')),
+    path('api/chat/', include('core.urls_chat')),
+    path('api/analytics/', include('analytics.urls')),
 ]
 
 if settings.DEBUG:

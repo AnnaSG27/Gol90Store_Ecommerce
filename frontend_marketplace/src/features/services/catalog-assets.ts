@@ -74,15 +74,32 @@ export function getProductFallbackImages(seed: string, count = 3) {
   return Array.from(new Set(urls))
 }
 
+function apiBase() {
+  return (process.env.NEXT_PUBLIC_API_URL ?? "").replace(/\/$/, "")
+}
+
+/** Rutas /media/... del backend como URL absoluta para <img> en el cliente. */
+export function absolutizeBackendMediaUrl(
+  url: string | null | undefined,
+): string | null {
+  if (url == null) return null
+  const t = url.trim()
+  if (!t) return null
+  if (t.startsWith("http://") || t.startsWith("https://")) return t
+  const base = apiBase()
+  if (base && t.startsWith("/")) return `${base}${t}`
+  return t
+}
+
 export function resolveProductImages(
   seed: string,
   remoteImages: Array<{ url: string }> = [],
   remoteMain?: string | null,
 ) {
   const mapped = [
-    ...(remoteMain ? [remoteMain] : []),
-    ...remoteImages.map((image) => image.url),
-  ].filter(Boolean)
+    ...(remoteMain ? [absolutizeBackendMediaUrl(remoteMain)] : []),
+    ...remoteImages.map((image) => absolutizeBackendMediaUrl(image.url)),
+  ].filter(Boolean) as string[]
 
   if (mapped.length > 0) return mapped
   return getProductFallbackImages(seed, 3)

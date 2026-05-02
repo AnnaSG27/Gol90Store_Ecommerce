@@ -47,6 +47,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'usuarios',
     'productos',
+    'pedidos',
+    'analytics',
 ]
 
 CORS_ALLOWED_ORIGINS = [
@@ -153,3 +155,15 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
+
+# Cache — LocMemCache for local/test; override with Redis in production
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+    }
+}
+
+# Google Gemini AI
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', '')
+GEMINI_MODEL_NAME = os.getenv('GEMINI_MODEL_NAME', 'gemini-1.5-flash')
+GEMINI_RATE_LIMIT = 60  # requests per minute (free tier limit)

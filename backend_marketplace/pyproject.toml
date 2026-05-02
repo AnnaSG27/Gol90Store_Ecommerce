@@ -1,9 +1,9 @@
 [project]
 name = "backend-marketplace"
 version = "0.1.0"
-description = "Add your description here"
+description = "Gol90Store backend — Django + DRF marketplace for football products"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 dependencies = [
     "django==6.0.2",
     "django-cors-headers==4.7.0",
@@ -15,3 +15,26 @@ dependencies = [
     "psycopg2-binary==2.9.11",
     "python-dotenv==1.2.1",
 ]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+]
+ignore = [
+    "E501",  # line-too-long handled per-file if needed
+]
+
+[tool.ruff.lint.per-file-ignores]
+"*/migrations/*.py" = ["E501", "N806"]
+
+[tool.ruff.format]
+quote-style = "single"
+indent-style = "space"

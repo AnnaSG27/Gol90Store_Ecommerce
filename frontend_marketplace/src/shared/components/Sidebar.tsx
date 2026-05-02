@@ -1,34 +1,44 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { usePathname } from "next/navigation"
 import {
+  RiFileList3Line,
   RiHome5Line,
-  RiShoppingCart2Line,
   RiSearchLine,
+  RiShoppingCart2Line,
+  RiStore2Line,
   RiUserLine,
-} from "@remixicon/react"
+} from "@remixicon/react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
-import { useCart } from "@/features/cart/CartContext"
-import { BRAND_LOGO_PRIMARY } from "@/features/services/catalog-assets"
-import { cn } from "@/lib/utils"
-import { useAuth } from "@/infrastructure/auth/AuthContext"
+import { useCart } from "@/features/cart/CartContext";
+import { BRAND_LOGO_PRIMARY } from "@/features/services/catalog-assets";
+import { useAuth } from "@/infrastructure/auth/AuthContext";
+import { cn } from "@/lib/utils";
 
 const navigation = [
   { name: "Inicio", href: "/", icon: RiHome5Line },
   { name: "Catalogo", href: "/productos", icon: RiSearchLine },
   { name: "Carrito", href: "/carrito", icon: RiShoppingCart2Line },
+  { name: "Mis pedidos", href: "/mis-pedidos", icon: RiFileList3Line },
   { name: "Mi cuenta", href: "/profile", icon: RiUserLine },
-] as const
+] as const;
+
+const sellerNavigation = [
+  { name: "Panel vendedor", href: "/seller", icon: RiStore2Line },
+] as const;
 
 export function Sidebar() {
-  const pathname = usePathname()
-  const { perfil, logout } = useAuth()
-  const { totalItems } = useCart()
+  const pathname = usePathname();
+  const { perfil, logout } = useAuth();
+  const { totalItems } = useCart();
+  const canSell =
+    perfil?.tipo_usuario === "freelancer" || perfil?.tipo_usuario === "ambos";
+  const navItems = canSell ? [...navigation, ...sellerNavigation] : navigation;
 
   const initials = perfil
     ? `${perfil.first_name?.[0] ?? ""}${perfil.last_name?.[0] ?? ""}`.toUpperCase()
-    : ""
+    : "";
 
   return (
     <aside className="flex h-screen w-64 flex-col bg-[linear-gradient(180deg,#0b1f1a_0%,#133126_100%)] text-white">
@@ -49,10 +59,10 @@ export function Sidebar() {
       </div>
 
       <nav className="flex-1 space-y-1 px-3 pt-4">
-        {navigation.map((item) => {
+        {navItems.map((item) => {
           const isActive =
             pathname === item.href ||
-            (item.href !== "/" && pathname.startsWith(item.href))
+            (item.href !== "/" && pathname.startsWith(item.href));
           return (
             <Link
               key={item.name}
@@ -61,7 +71,7 @@ export function Sidebar() {
                 "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive
                   ? "bg-emerald-600 text-white shadow-md"
-                  : "text-emerald-100/70 hover:bg-white/10 hover:text-white"
+                  : "text-emerald-100/70 hover:bg-white/10 hover:text-white",
               )}
             >
               <item.icon className="size-5" />
@@ -72,7 +82,7 @@ export function Sidebar() {
                 </span>
               )}
             </Link>
-          )
+          );
         })}
       </nav>
 
@@ -91,6 +101,7 @@ export function Sidebar() {
           </div>
         </div>
         <button
+          type="button"
           onClick={logout}
           className="mt-3 w-full rounded-lg px-3 py-2 text-left text-sm text-emerald-100/70 transition-colors hover:bg-white/10 hover:text-white"
         >
@@ -98,5 +109,5 @@ export function Sidebar() {
         </button>
       </div>
     </aside>
-  )
+  );
 }

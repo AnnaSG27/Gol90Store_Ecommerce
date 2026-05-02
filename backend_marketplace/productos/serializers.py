@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from rest_framework import serializers
 
 from .models import ImagenProducto, Producto
@@ -16,8 +18,8 @@ class VendedorResumenSerializer(serializers.Serializer):
 
     def get_iniciales(self, obj):
         f = obj.first_name[:1] if obj.first_name else ''
-        l = obj.last_name[:1] if obj.last_name else ''
-        initials = f'{f}{l}'.upper()
+        ln = obj.last_name[:1] if obj.last_name else ''
+        initials = f'{f}{ln}'.upper()
         if initials:
             return initials
         return obj.email[:2].upper()
@@ -96,6 +98,8 @@ class ProductoDetailSerializer(serializers.ModelSerializer):
 
 
 class ProductoCreateSerializer(serializers.ModelSerializer):
+    precio = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal('0.01'))
+    stock = serializers.IntegerField(min_value=0)
     imagenes = serializers.ListField(
         child=serializers.ImageField(),
         max_length=3,

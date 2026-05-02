@@ -1,0 +1,74 @@
+# ==========================
+# OS / Editors
+# ==========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ==========================
+# Python
+# ==========================
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+venv/
+.venv/
+env/
+
+# ==========================
+# Django
+# ==========================
+*.log
+local_settings.py
+db.sqlite3
+backend_marketplace/db.sqlite3
+staticfiles/
+media/
+
+# ==========================
+# Environment
+# ==========================
+.env
+.env.*
+!.env.example
+
+# ==========================
+# PostgreSQL / dumps
+# ==========================
+*.pgdump
+*.dump
+
+# ==========================
+# Node / Bun / Next
+# ==========================
+node_modules/
+.next/
+out/
+.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==========================
+# Build artifacts
+# ==========================
+dist/
+build/
+coverage/
+
+# ==========================
+# Binary / generated
+# ==========================
+*.pid
+*.seed
+*.tmp
+*.temp

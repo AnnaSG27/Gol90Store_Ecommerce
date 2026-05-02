@@ -1,0 +1,68 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: gol90store-db
+    environment:
+      - POSTGRES_DB=marketplace
+      - POSTGRES_USER=marketplace
+      - POSTGRES_PASSWORD=marketplace
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U marketplace"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - marketplace
+
+  backend:
+    build:
+      context: ./backend_marketplace
+      dockerfile: Dockerfile
+    container_name: gol90store-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend_marketplace:/app
+    environment:
+      - DEBUG=True
+      - PYTHONUNBUFFERED=1
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=marketplace
+      - DB_USER=marketplace
+      - DB_PASSWORD=marketplace
+    command: bash /app/entrypoint.sh
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - marketplace
+
+  frontend:
+    build:
+      context: ./frontend_marketplace
+      dockerfile: Dockerfile
+    container_name: gol90store-frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend_marketplace:/app
+      - /app/node_modules
+      - /app/.next
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+    networks:
+      - marketplace
+
+volumes:
+  pgdata:
+
+networks:
+  marketplace:
+    driver: bridge

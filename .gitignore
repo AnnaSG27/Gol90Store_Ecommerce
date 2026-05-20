@@ -39,6 +39,7 @@ media/
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # ==========================
 # PostgreSQL / dumps

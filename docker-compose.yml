@@ -46,6 +46,7 @@ services:
     build:
       context: ./frontend_marketplace
       dockerfile: Dockerfile
+      target: dev
     container_name: gol90store-frontend
     ports:
       - "3000:3000"

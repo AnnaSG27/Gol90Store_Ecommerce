@@ -1,0 +1,80 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: gol90store-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - marketplace
+
+  backend:
+    build:
+      context: ./backend_marketplace
+      dockerfile: Dockerfile
+    container_name: gol90store-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=${DEBUG:-False}
+      - SECRET_KEY=${SECRET_KEY}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS}
+      - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+      - CSRF_TRUSTED_ORIGINS=${CSRF_TRUSTED_ORIGINS}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST:-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+      - SEED_DEMO_ON_START=${SEED_DEMO_ON_START:-false}
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-3}
+      - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-60}
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - backend_media:/app/media
+      - backend_static:/app/staticfiles
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - marketplace
+
+  frontend:
+    build:
+      context: ./frontend_marketplace
+      dockerfile: Dockerfile
+      target: runner
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+    container_name: gol90store-frontend
+    restart: unless-stopped
+    ports:
+      - "80:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - NODE_ENV=production
+      - HOSTNAME=0.0.0.0
+      - PORT=3000
+    depends_on:
+      - backend
+    networks:
+      - marketplace
+
+volumes:
+  pgdata:
+  backend_media:
+  backend_static:
+
+networks:
+  marketplace:
+    driver: bridge

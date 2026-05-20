@@ -228,6 +228,124 @@ Validaciones incluidas:
 
 No requiere secretos, despliegue ni configuracion de proveedores de pago externos.
 
+## Sprint 3 — Despliegue en Google Cloud (VM Compute Engine + Docker Compose)
+
+Esta seccion documenta el despliegue manual en una VM publica de GCP usando Docker Compose. No requiere CI/CD, ni balanceador, ni Cloud Run. Es el flujo academico aprobado para Sprint 3.
+
+### Resumen de servicios en produccion
+
+- `db`: PostgreSQL 16 en contenedor, datos persistidos en volumen `pgdata`.
+- `backend`: Django + DRF sirviendo con `gunicorn` en el puerto 8000.
+- `frontend`: Next.js 16 construido y servido con `next start`, expuesto al puerto 80 del host.
+
+### Archivos relevantes
+
+- `docker-compose.production.yml`: orquesta los tres servicios.
+- `.env.production.example`: plantilla de variables; copiar a `.env.production` en la VM y reemplazar valores.
+- `backend_marketplace/Dockerfile`: imagen del backend.
+- `backend_marketplace/entrypoint.production.sh`: espera Postgres, aplica migraciones, recolecta estaticos, arranca gunicorn y opcionalmente carga datos demo.
+- `frontend_marketplace/Dockerfile`: multi-stage con stages `dev`, `builder` y `runner`. Produccion usa `target: runner`.
+
+### Variables necesarias
+
+Definidas en `.env.production` en la VM. Ver `.env.production.example` para la plantilla completa.
+
+- `SECRET_KEY`: llave secreta de Django (cambiar por una larga y segura).
+- `DEBUG`: debe ser `False` en produccion.
+- `ALLOWED_HOSTS`: IP publica de la VM y opcionalmente `localhost,127.0.0.1`.
+- `CORS_ALLOWED_ORIGINS`: origenes del frontend con esquema, p.ej. `http://IP_PUBLICA,http://IP_PUBLICA:3000`.
+- `CSRF_TRUSTED_ORIGINS`: mismos origenes que CORS, con esquema.
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`: credenciales de la base.
+- `POSTGRES_HOST` (por defecto `db`), `POSTGRES_PORT` (por defecto `5432`).
+- `NEXT_PUBLIC_API_URL`: URL publica del backend que el navegador del cliente usara, p.ej. `http://IP_PUBLICA:8000`. Se inyecta como build arg al frontend.
+- `SEED_DEMO_ON_START`: `true` solo si quieres que el backend cargue datos demo en cada arranque. Recomendado dejarlo en `false`.
+- `GUNICORN_WORKERS`, `GUNICORN_TIMEOUT`: ajustes opcionales.
+
+### Prerequisitos en la VM
+
+1. Sistema Debian/Ubuntu con Docker Engine y plugin `docker compose` instalados.
+2. Firewall de GCP permite trafico TCP entrante a los puertos `80` y `8000`.
+3. Repositorio clonado en la VM.
+
+### Comandos de despliegue
+
+Desde la raiz del repositorio en la VM:
+
+```bash
+cp .env.production.example .env.production
+nano .env.production   # reemplazar IP_PUBLICA y secretos
+
+docker compose -f docker-compose.production.yml --env-file .env.production up -d --build
+```
+
+Tras unos segundos:
+
+- Frontend: `http://IP_PUBLICA/`
+- Backend API: `http://IP_PUBLICA:8000/`
+- Django Admin: `http://IP_PUBLICA:8000/admin/`
+- Health: `http://IP_PUBLICA:8000/healthz/` debe responder `ok` con 200.
+
+### Revisar estado y logs
+
+```bash
+docker compose -f docker-compose.production.yml --env-file .env.production ps
+
+docker compose -f docker-compose.production.yml --env-file .env.production logs backend --tail=100
+docker compose -f docker-compose.production.yml --env-file .env.production logs frontend --tail=100
+docker compose -f docker-compose.production.yml --env-file .env.production logs db --tail=50
+
+docker compose -f docker-compose.production.yml --env-file .env.production logs -f backend
+```
+
+### Correr migraciones manualmente
+
+El backend aplica `migrate --noinput` automaticamente al arrancar. Para forzarlo o ejecutar comandos extra:
+
+```bash
+docker compose -f docker-compose.production.yml --env-file .env.production exec backend python manage.py migrate
+docker compose -f docker-compose.production.yml --env-file .env.production exec backend python manage.py makemigrations
+docker compose -f docker-compose.production.yml --env-file .env.production exec backend python manage.py showmigrations
+```
+
+### Cargar datos demo (opcional, manual)
+
+`seed_demo` no se ejecuta automaticamente salvo que `SEED_DEMO_ON_START=true`. Para cargarlo bajo demanda:
+
+```bash
+docker compose -f docker-compose.production.yml --env-file .env.production exec backend python manage.py seed_habilidades
+docker compose -f docker-compose.production.yml --env-file .env.production exec backend python manage.py seed_demo
+```
+
+Crear un superusuario interactivo:
+
+```bash
+docker compose -f docker-compose.production.yml --env-file .env.production exec backend python manage.py createsuperuser
+```
+
+### Reiniciar, detener o reconstruir
+
+```bash
+docker compose -f docker-compose.production.yml --env-file .env.production restart backend
+docker compose -f docker-compose.production.yml --env-file .env.production down
+docker compose -f docker-compose.production.yml --env-file .env.production up -d --build
+```
+
+Para borrar todo incluyendo datos de Postgres:
+
+```bash
+docker compose -f docker-compose.production.yml --env-file .env.production down -v
+```
+
+### Checklist de verificacion post-despliegue
+
+- [ ] `docker compose ... ps` muestra `db`, `backend` y `frontend` como `Up` (healthy donde aplica).
+- [ ] `curl -i http://IP_PUBLICA:8000/healthz/` responde `200 OK` con cuerpo `ok`.
+- [ ] `curl -i http://IP_PUBLICA:8000/api/productos/` responde JSON.
+- [ ] `http://IP_PUBLICA/` carga el frontend en el navegador.
+- [ ] Login y registro funcionan desde el navegador apuntando al backend publico.
+- [ ] `http://IP_PUBLICA:8000/admin/` carga el Django Admin con sus estaticos.
+- [ ] Logs del backend no muestran trazas de error en el arranque.
+
 ## Estado tecnico conocido
 
 - La base activa para desarrollo Docker es PostgreSQL.

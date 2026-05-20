@@ -29,9 +29,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-me#0qlbo*ez@xo$zv(msf2t@84=8g8516wvo!sm)6adjv4qc$%')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv('DEBUG', 'True') == 'True'
+DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 'yes', 'on')
 
-ALLOWED_HOSTS = []
+
+def _split_env_list(value: str) -> list[str]:
+    """Split a comma-separated env value into a clean list of strings."""
+    if not value:
+        return []
+    return [item.strip() for item in value.split(',') if item.strip()]
+
+
+ALLOWED_HOSTS = _split_env_list(os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1'))
 
 
 # Application definition
@@ -51,12 +59,15 @@ INSTALLED_APPS = [
     'analytics',
 ]
 
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',
-]
+CORS_ALLOWED_ORIGINS = _split_env_list(
+    os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000')
+)
+
+CSRF_TRUSTED_ORIGINS = _split_env_list(os.getenv('CSRF_TRUSTED_ORIGINS', ''))
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -92,11 +103,11 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv('DB_NAME', 'marketplace'),
-        'USER': os.getenv('DB_USER', 'marketplace'),
-        'PASSWORD': os.getenv('DB_PASSWORD', 'marketplace'),
-        'HOST': os.getenv('DB_HOST', 'localhost'),
-        'PORT': os.getenv('DB_PORT', '5432'),
+        'NAME': os.getenv('POSTGRES_DB', os.getenv('DB_NAME', 'marketplace')),
+        'USER': os.getenv('POSTGRES_USER', os.getenv('DB_USER', 'marketplace')),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD', os.getenv('DB_PASSWORD', 'marketplace')),
+        'HOST': os.getenv('POSTGRES_HOST', os.getenv('DB_HOST', 'localhost')),
+        'PORT': os.getenv('POSTGRES_PORT', os.getenv('DB_PORT', '5432')),
     }
 }
 
@@ -136,6 +147,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
